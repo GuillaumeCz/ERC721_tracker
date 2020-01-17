@@ -1,5 +1,5 @@
 import json
-import time
+import asyncio
 
 from web3.auto import w3
 
@@ -16,28 +16,25 @@ def is_address_null(address):
 
 
 class SimpleToken:
-    def update_balances(self):
-        # dict{ address: set(tokenId) }
-        user_balances = {}
+    # dict{ address: set(tokenId) }
+    balances = {}
 
-        for entry in self.transfers:
-            token_id = entry['args']['tokenId']
-            user_from = entry['args']['from']
-            user_to = entry['args']['to']
+    def process_entries(self, _filter):
+        for entry in _filter.get_all_entries():
+            self.process_entry(entry)
 
-            if user_from not in user_balances and not is_address_null(user_from):
-                user_balances[user_from] = {token_id}
+    def process_entry(self, entry):
+        token_id = entry['args']['tokenId']
+        user_from = entry['args']['from']
+        user_to = entry['args']['to']
 
-            if not is_address_null(user_from) and token_id in user_balances[user_from]:
-                user_balances[user_from].remove(token_id)
+        if not is_address_null(user_from):
+            self.balances[user_from].remove(token_id)
 
-            if user_to not in user_balances and not is_address_null(user_to):
-                user_balances[user_to] = set([])
-
-            if not is_address_null(user_to):
-                user_balances[user_to].add(token_id)
-
-        return user_balances
+        if not is_address_null(user_to):
+            if user_to not in self.balances:
+                self.balances[user_to] = set([])
+            self.balances[user_to].add(token_id)
 
     def get_token_list(self):
         tokens = set([])
@@ -45,24 +42,32 @@ class SimpleToken:
             tokens.update(self.balances[user])
         return tokens
 
-    def listen(self, event_filter, poll_interval):
+    def get_users(self):
+        return self.balances.keys()
+
+    async def listen(self, event_filter, poll_interval):
+        print("Listening...")
         while True:
             for event in event_filter.get_new_entries():
-                print("New event", event)
-                print("#######")
-            time.sleep(poll_interval)
+                self.process_entry(event)
+            await asyncio.sleep(poll_interval)
 
     def __init__(self, address, abi_location):
         self.abi = get_abi(abi_location)
         self.simple_token_contract = w3.eth.contract(abi=self.abi, address=address)
-        self.transfer_events = self.simple_token_contract.events.Transfer.createFilter(fromBlock=0)
-        self.transfers = self.transfer_events.get_all_entries()
+        self.filter = self.simple_token_contract.events.Transfer.createFilter(fromBlock=0)
 
-        self.balances = self.update_balances()
-        self.users = self.balances.keys()
-        self.tokens = self.get_token_list()
+        # self.process_entries(self.filter)
+        # self.users = self.get_users()
+        # self.tokens = self.get_token_list()
 
-        self.listen(self.transfer_events, 1)
+        loop = asyncio.get_event_loop()
+        try:
+            loop.run_until_complete(
+                self.listen(self.transfer_events, 1)
+            )
+        finally:
+            loop.close()
 
 
 contract_address = "0xCfEB869F69431e42cdB54A4F4f105C19C080A601"
