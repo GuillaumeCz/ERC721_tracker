@@ -54,14 +54,15 @@ class Transfer:
     @staticmethod
     def get_timestamp(_block_number):
         block = w3.eth.getBlock(_block_number)
-        timestamp = block.timestamp
-        return timestamp_to_iso(timestamp)
+        return block.timestamp
 
     def __init__(self, _entry):
         self.emitter = _entry['args']['from']
         self.receiver = _entry['args']['to']
         self.token_id = _entry['args']['tokenId']
-        self.block_number = _entry['blockNumber']
+        block_number = _entry['blockNumber']
+        self.timestamp = self.get_timestamp(block_number)
+        self.iso = timestamp_to_iso(self.timestamp)
 
     def __repr__(self):
         return str(self.__dict__)
@@ -151,12 +152,12 @@ contract_abi_location = './SimpleToken.json'
 ns = NameSystem()
 simple_token = SimpleToken(contract_address, contract_abi_location, ns, w3)
 
-print('# ', simple_token.get_token_list())
-print('## ', simple_token.get_user_addresses())
+# print('# ', simple_token.get_token_list())
+# print('## ', simple_token.get_user_addresses())
 
 # print('# ', simple_token.users)
-# print('## ', simple_token.transfers)
+print('## ', simple_token.transfers)
 
-accounts = ns.get_user_list_by_address_list(simple_token.get_user_addresses())
-print('## - ', accounts)
+# accounts = ns.get_user_list_by_address_list(simple_token.get_user_addresses())
+# print('## - ', accounts)
 # print('### ', simple_token.tokens)
