@@ -40,6 +40,12 @@ class SimpleToken:
     # dict{ address: set(tokenId) }
     balances = {}
 
+    def get_tx_timestamp(self, _block_number):
+        block = self.w3.eth.getBlock(_block_number)
+        timestamp = block.timestamp
+        iso = time.ctime(timestamp)
+        return iso
+
     def process_entries(self, _filter):
         for entry in _filter.get_new_entries():
             self.process_entry(entry)
@@ -49,6 +55,8 @@ class SimpleToken:
         token_id = _entry['args']['tokenId']
         user_from = _entry['args']['from']
         user_to = _entry['args']['to']
+        block_number = _entry['blockNumber']
+        timestamp = self.get_tx_timestamp(block_number)
 
         if not is_address_null(user_from):
             self.balances[user_from].remove(token_id)
@@ -60,7 +68,7 @@ class SimpleToken:
 
         u_from = self.ns_instance.get_user_by_address(user_from)
         u_to = self.ns_instance.get_user_by_address(user_to)
-        print('from', u_from, 'to', u_to, 'token', token_id)
+        print('from', u_from, 'to', u_to, 'token', token_id, 'at', timestamp)
 
     def get_token_list(self):
         tokens = set([])
@@ -89,11 +97,12 @@ class SimpleToken:
         for entry in _filter.get_all_entries():
             self.process_entry(entry)
 
-    def __init__(self, _address, _abi_location, _name_system_instance):
+    def __init__(self, _address, _abi_location, _name_system_instance, _w3):
         self.ns_instance = _name_system_instance
+        self.w3 = _w3
 
         abi = get_abi(_abi_location)
-        simple_token_contract = w3.eth.contract(abi=abi, address=_address)
+        simple_token_contract = self.w3.eth.contract(abi=abi, address=_address)
         w3_filter = simple_token_contract.events.Transfer.createFilter(fromBlock=0)
 
         self.process_entries(w3_filter)
@@ -120,7 +129,7 @@ contract_address = "0xCfEB869F69431e42cdB54A4F4f105C19C080A601"
 contract_abi_location = './SimpleToken.json'
 
 ns = NameSystem()
-simple_token = SimpleToken(contract_address, contract_abi_location, ns)
+simple_token = SimpleToken(contract_address, contract_abi_location, ns, w3)
 
 # print('# ', simple_token.balances)
 # print('## ', simple_token.users)
