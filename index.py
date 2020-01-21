@@ -1,7 +1,6 @@
 import json
 import asyncio
 import time
-
 from web3.auto import w3
 
 
@@ -14,6 +13,10 @@ def get_abi(_abi_uri):
 
 def is_address_null(_address):
     return int(_address, 16) == 0
+
+
+def timestamp_to_iso(_timestamp):
+    return time.ctime(_timestamp)
 
 
 class NameSystem:
@@ -36,48 +39,65 @@ class NameSystem:
         self.address_to_name["0x22d491Bde2303f2f43325b2108D26f1eAbA1e32b"] = "Bill"
 
 
-class SimpleToken:
-    # dict{ address: set(tokenId) }
-    balances = {}
+class User:
+    def __init__(self, _address, _name=None):
+        if _name is not None:
+            self.name = _name
+        self.address = _address
+        self.balance = set([])
 
-    def get_tx_timestamp(self, _block_number):
-        block = self.w3.eth.getBlock(_block_number)
+    def __repr__(self):
+        return str(self.__dict__)
+
+
+class Transfer:
+    @staticmethod
+    def get_timestamp(_block_number):
+        block = w3.eth.getBlock(_block_number)
         timestamp = block.timestamp
-        iso = time.ctime(timestamp)
-        return iso
+        return timestamp_to_iso(timestamp)
+
+    def __init__(self, _entry):
+        self.emitter = _entry['args']['from']
+        self.receiver = _entry['args']['to']
+        self.token_id = _entry['args']['tokenId']
+        self.block_number = _entry['blockNumber']
+
+    def __repr__(self):
+        return str(self.__dict__)
+
+
+class SimpleToken:
+    transfers = []
+    users = {}
 
     def process_entries(self, _filter):
         for entry in _filter.get_new_entries():
             self.process_entry(entry)
 
     def process_entry(self, _entry):
-        print('- processing...')
         token_id = _entry['args']['tokenId']
         user_from = _entry['args']['from']
         user_to = _entry['args']['to']
-        block_number = _entry['blockNumber']
-        timestamp = self.get_tx_timestamp(block_number)
 
         if not is_address_null(user_from):
-            self.balances[user_from].remove(token_id)
+            self.users[user_from].balance.remove(token_id)
 
         if not is_address_null(user_to):
-            if user_to not in self.balances:
-                self.balances[user_to] = set([])
-            self.balances[user_to].add(token_id)
+            if user_to not in self.users:
+                self.users[user_to] = User(user_to)
+            self.users[user_to].balance.add(token_id)
 
-        u_from = self.ns_instance.get_user_by_address(user_from)
-        u_to = self.ns_instance.get_user_by_address(user_to)
-        print('from', u_from, 'to', u_to, 'token', token_id, 'at', timestamp)
+        self.transfers.append(Transfer(_entry))
 
     def get_token_list(self):
         tokens = set([])
-        for user in self.balances:
-            tokens.update(self.balances[user])
+        for user in self.users:
+            tokens.update(self.users[user].balance)
         return tokens
 
     def get_user_addresses(self):
-        return self.balances.keys()
+        return self.users.keys()
 
     async def async_listen(self, _event_filter, _poll_interval):
         print("Listening...")
@@ -106,7 +126,7 @@ class SimpleToken:
         w3_filter = simple_token_contract.events.Transfer.createFilter(fromBlock=0)
 
         self.process_entries(w3_filter)
-        self.users = self.get_user_addresses()
+        self._users = self.get_user_addresses()
         self.tokens = self.get_token_list()
 
         # - past -
@@ -131,8 +151,12 @@ contract_abi_location = './SimpleToken.json'
 ns = NameSystem()
 simple_token = SimpleToken(contract_address, contract_abi_location, ns, w3)
 
-# print('# ', simple_token.balances)
-# print('## ', simple_token.users)
-# accounts = ns.get_user_list_by_address_list(simple_token.users)
-# print('## - ', accounts)
+print('# ', simple_token.get_token_list())
+print('## ', simple_token.get_user_addresses())
+
+# print('# ', simple_token.users)
+# print('## ', simple_token.transfers)
+
+accounts = ns.get_user_list_by_address_list(simple_token.get_user_addresses())
+print('## - ', accounts)
 # print('### ', simple_token.tokens)
