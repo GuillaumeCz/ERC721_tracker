@@ -15,6 +15,26 @@ def is_address_null(address):
     return int(address, 16) == 0
 
 
+class NameSystem:
+    address_to_name = {}
+
+    def get_user_by_address(self, _address):
+        if is_address_null(_address):
+            return '0x'
+        return self.address_to_name[_address]
+
+    def get_user_list_by_address_list(self, _addresses):
+        names = []
+        for address in _addresses:
+            if not is_address_null(address):
+                names.append(self.get_user_by_address(address))
+        return names
+
+    def __init__(self):
+        self.address_to_name["0xFFcf8FDEE72ac11b5c542428B35EEF5769C409f0"] = "Joe"
+        self.address_to_name["0x22d491Bde2303f2f43325b2108D26f1eAbA1e32b"] = "Bill"
+
+
 class SimpleToken:
     # dict{ address: set(tokenId) }
     balances = {}
@@ -24,6 +44,7 @@ class SimpleToken:
             self.process_entry(entry)
 
     def process_entry(self, entry):
+        print('- processing...')
         token_id = entry['args']['tokenId']
         user_from = entry['args']['from']
         user_to = entry['args']['to']
@@ -36,35 +57,45 @@ class SimpleToken:
                 self.balances[user_to] = set([])
             self.balances[user_to].add(token_id)
 
+        u_from = self.ns_instance.get_user_by_address(user_from)
+        u_to = self.ns_instance.get_user_by_address(user_to)
+        print('from', u_from, 'to', u_to, 'token', token_id)
+
     def get_token_list(self):
         tokens = set([])
         for user in self.balances:
             tokens.update(self.balances[user])
         return tokens
 
-    def get_users(self):
+    def get_user_addresses(self):
         return self.balances.keys()
 
-    async def listen(self, event_filter, poll_interval):
+    async def async_listen(self, event_filter, poll_interval):
         print("Listening...")
         while True:
             for event in event_filter.get_new_entries():
                 self.process_entry(event)
             await asyncio.sleep(poll_interval)
 
-    def __init__(self, address, abi_location):
+    def listen(self, event_filter):
+        while True:
+            for event in event_filter.get_new_entries():
+                self.process_entry(event)
+
+    def __init__(self, address, abi_location, name_system_instance):
+        self.ns_instance = name_system_instance
         self.abi = get_abi(abi_location)
         self.simple_token_contract = w3.eth.contract(abi=self.abi, address=address)
         self.filter = self.simple_token_contract.events.Transfer.createFilter(fromBlock=0)
 
-        # self.process_entries(self.filter)
-        # self.users = self.get_users()
-        # self.tokens = self.get_token_list()
+        self.process_entries(self.filter)
+        self.users = self.get_user_addresses()
+        self.tokens = self.get_token_list()
 
         loop = asyncio.get_event_loop()
         try:
             loop.run_until_complete(
-                self.listen(self.transfer_events, 1)
+                self.async_listen(self.filter, 1)
             )
         finally:
             loop.close()
@@ -73,8 +104,11 @@ class SimpleToken:
 contract_address = "0xCfEB869F69431e42cdB54A4F4f105C19C080A601"
 contract_abi_location = './SimpleToken.json'
 
-simple_token = SimpleToken(contract_address, contract_abi_location)
+ns = NameSystem()
+simple_token = SimpleToken(contract_address, contract_abi_location, ns)
 
 # print('# ', simple_token.balances)
 # print('## ', simple_token.users)
+# accounts = ns.get_user_list_by_address_list(simple_token.users)
+# print('## - ', accounts)
 # print('### ', simple_token.tokens)

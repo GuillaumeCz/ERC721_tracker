@@ -5,7 +5,7 @@ Erc721 token tracker using web3 filters
 Prerequisite
 ````bash
 # launch a venv
-. venv/bin/activate
+. venv/bin/activate (or ./venv/Scripts/Activate.ps1, from PowerShell)
 # install requirements
 pip install -r requirements.txt
 ````
@@ -19,3 +19,7 @@ Run
 ````bash
 python index.py
 ````
+
+CheatSheet python3 venv:
+- python3 -m venv ./venv
+
