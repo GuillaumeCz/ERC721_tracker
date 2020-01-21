@@ -1,18 +1,19 @@
 import json
 import asyncio
+import time
 
 from web3.auto import w3
 
 
-def get_abi(abi_uri):
-    with open(abi_uri, "r") as myFile:
+def get_abi(_abi_uri):
+    with open(_abi_uri, "r") as myFile:
         data = myFile.read()
     simple_token_json = json.loads(data)
     return simple_token_json['abi']
 
 
-def is_address_null(address):
-    return int(address, 16) == 0
+def is_address_null(_address):
+    return int(_address, 16) == 0
 
 
 class NameSystem:
@@ -43,11 +44,11 @@ class SimpleToken:
         for entry in _filter.get_all_entries():
             self.process_entry(entry)
 
-    def process_entry(self, entry):
+    def process_entry(self, _entry):
         print('- processing...')
-        token_id = entry['args']['tokenId']
-        user_from = entry['args']['from']
-        user_to = entry['args']['to']
+        token_id = _entry['args']['tokenId']
+        user_from = _entry['args']['from']
+        user_to = _entry['args']['to']
 
         if not is_address_null(user_from):
             self.balances[user_from].remove(token_id)
@@ -70,35 +71,42 @@ class SimpleToken:
     def get_user_addresses(self):
         return self.balances.keys()
 
-    async def async_listen(self, event_filter, poll_interval):
+    async def async_listen(self, _event_filter, _poll_interval):
         print("Listening...")
         while True:
-            for event in event_filter.get_new_entries():
+            for event in _event_filter.get_new_entries():
                 self.process_entry(event)
-            await asyncio.sleep(poll_interval)
+            await asyncio.sleep(_poll_interval)
 
-    def listen(self, event_filter):
+    def sync_listen(self, _event_filter, _poll_interval):
+        print("Listening...")
         while True:
-            for event in event_filter.get_new_entries():
+            for event in _event_filter.get_new_entries():
                 self.process_entry(event)
+            time.sleep(_poll_interval)
 
-    def __init__(self, address, abi_location, name_system_instance):
-        self.ns_instance = name_system_instance
-        self.abi = get_abi(abi_location)
-        self.simple_token_contract = w3.eth.contract(abi=self.abi, address=address)
-        self.filter = self.simple_token_contract.events.Transfer.createFilter(fromBlock=0)
+    def __init__(self, _address, _abi_location, _name_system_instance):
+        self.ns_instance = _name_system_instance
 
-        self.process_entries(self.filter)
+        abi = get_abi(_abi_location)
+        simple_token_contract = w3.eth.contract(abi=abi, address=_address)
+        w3_filter = simple_token_contract.events.Transfer.createFilter(fromBlock=0)
+
+        self.process_entries(w3_filter)
         self.users = self.get_user_addresses()
         self.tokens = self.get_token_list()
 
-        loop = asyncio.get_event_loop()
-        try:
-            loop.run_until_complete(
-                self.async_listen(self.filter, 1)
-            )
-        finally:
-            loop.close()
+        # - sync -
+        self.sync_listen(w3_filter, 1)
+
+        # - async -
+        # loop = asyncio.get_event_loop()
+        # try:
+        #     loop.run_until_complete(
+        #         self.async_listen(self.filter, 1)
+        #     )
+        # finally:
+        #     loop.close()
 
 
 contract_address = "0xCfEB869F69431e42cdB54A4F4f105C19C080A601"
