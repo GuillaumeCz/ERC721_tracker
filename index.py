@@ -8,7 +8,7 @@ def get_abi(_abi_uri):
     with open(_abi_uri, "r") as myFile:
         data = myFile.read()
     simple_token_json = json.loads(data)
-    return simple_token_json['abi']
+    return simple_token_json["abi"]
 
 
 def is_address_null(_address):
@@ -24,7 +24,7 @@ class NameSystem:
 
     def get_user_by_address(self, _address):
         if is_address_null(_address):
-            return '0x'
+            return "0x"
         return self.address_to_name[_address]
 
     def get_user_list_by_address_list(self, _addresses):
@@ -57,10 +57,10 @@ class Transfer:
         return block.timestamp
 
     def __init__(self, _entry):
-        self.emitter = _entry['args']['from']
-        self.receiver = _entry['args']['to']
-        self.token_id = _entry['args']['tokenId']
-        block_number = _entry['blockNumber']
+        self.emitter = _entry["args"]["from"]
+        self.receiver = _entry["args"]["to"]
+        self.token_id = _entry["args"]["tokenId"]
+        block_number = _entry["blockNumber"]
         self.timestamp = self.get_timestamp(block_number)
         self.iso = timestamp_to_iso(self.timestamp)
 
@@ -77,9 +77,9 @@ class SimpleToken:
             self.process_entry(entry)
 
     def process_entry(self, _entry):
-        token_id = _entry['args']['tokenId']
-        user_from = _entry['args']['from']
-        user_to = _entry['args']['to']
+        token_id = _entry["args"]["tokenId"]
+        user_from = _entry["args"]["from"]
+        user_to = _entry["args"]["to"]
 
         if not is_address_null(user_from):
             self.users[user_from].balance.remove(token_id)
@@ -147,7 +147,7 @@ class SimpleToken:
 
 
 contract_address = "0xCfEB869F69431e42cdB54A4F4f105C19C080A601"
-contract_abi_location = './SimpleToken.json'
+contract_abi_location = "./SimpleToken.json"
 
 ns = NameSystem()
 simple_token = SimpleToken(contract_address, contract_abi_location, ns, w3)
@@ -156,7 +156,7 @@ simple_token = SimpleToken(contract_address, contract_abi_location, ns, w3)
 # print('## ', simple_token.get_user_addresses())
 
 # print('# ', simple_token.users)
-print('## ', simple_token.transfers)
+print("## ", simple_token.transfers)
 
 # accounts = ns.get_user_list_by_address_list(simple_token.get_user_addresses())
 # print('## - ', accounts)
