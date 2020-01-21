@@ -41,7 +41,7 @@ class SimpleToken:
     balances = {}
 
     def process_entries(self, _filter):
-        for entry in _filter.get_all_entries():
+        for entry in _filter.get_new_entries():
             self.process_entry(entry)
 
     def process_entry(self, _entry):
@@ -85,6 +85,10 @@ class SimpleToken:
                 self.process_entry(event)
             time.sleep(_poll_interval)
 
+    def get_past_transactions(self, _filter):
+        for entry in _filter.get_all_entries():
+            self.process_entry(entry)
+
     def __init__(self, _address, _abi_location, _name_system_instance):
         self.ns_instance = _name_system_instance
 
@@ -96,8 +100,11 @@ class SimpleToken:
         self.users = self.get_user_addresses()
         self.tokens = self.get_token_list()
 
+        # - past -
+        self.get_past_transactions(w3_filter)
+
         # - sync -
-        self.sync_listen(w3_filter, 1)
+        # self.sync_listen(w3_filter, 1)
 
         # - async -
         # loop = asyncio.get_event_loop()
